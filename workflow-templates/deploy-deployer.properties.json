@@ -1,0 +1,14 @@
+{
+  "name": "Deploy Deployer Workflow",
+  "description": "Reusable workflow template for deploying PHP projects using Deployer and Composer. Configurable for branch, environment, PHP version, SSH host, and SSH user.",
+  "iconName": "cloud_upload",
+  "categories": [
+    "php",
+    "deployment",
+    "composer",
+    "ssh"
+  ],
+  "filePatterns": [
+    "deploy.php$"
+  ]
+}

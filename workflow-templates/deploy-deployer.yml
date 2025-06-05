@@ -1,0 +1,72 @@
+name: Deployer
+
+on:
+  workflow_call:
+    inputs:
+      branch:
+        required: true
+        type: string
+        description: "The branch to deploy"
+      environment:
+        required: true
+        type: string
+        description: "The deployer host"
+      php_version:
+        required: true
+        type: string
+        description: "The PHP version to use"
+      ssh_host:
+        required: true
+        type: string
+        description: "The deployment server hostname"
+      ssh_user:
+        required: true
+        type: string
+        description: "The deployment server user"
+    secrets:
+      BITBUCKET_SSH_KEY:
+        required: true
+      DEPLOY_SERVER_SSH_KEY:
+        required: true
+      PRIVATE_KEY:
+        required: true
+
+concurrency: ${{ inputs.ssh_host }}_environment
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php_version }}
+
+      - name: Setup SSH for Bitbucket
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BITBUCKET_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts
+
+      - name: Setup SSH for deployment server
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan ${{ inputs.ssh_host }} >> ~/.ssh/known_hosts
+        shell: bash
+
+      - name: Install dependencies
+        run: composer install
+
+      - name: Deploy
+        uses: deployphp/action@v1
+        with:
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          dep: deploy ${{ inputs.environment }}
