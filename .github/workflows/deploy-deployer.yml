@@ -47,6 +47,11 @@ jobs:
         with:
           php-version: ${{ inputs.php_version }}
 
+      - name: Setup SSH with ED25519 key
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
       - name: Setup SSH keys and config
         run: |
           mkdir -p ~/.ssh
