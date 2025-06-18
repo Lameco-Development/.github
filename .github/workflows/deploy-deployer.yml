@@ -24,8 +24,6 @@ on:
         type: string
         description: "The deployment server user"
     secrets:
-      BITBUCKET_SSH_KEY:
-        required: true
       DEPLOY_SERVER_SSH_KEY:
         required: true
       PRIVATE_KEY:
@@ -50,15 +48,9 @@ jobs:
       - name: Setup SSH keys and config
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.BITBUCKET_SSH_KEY }}" > ~/.ssh/id_bitbucket
-          chmod 600 ~/.ssh/id_bitbucket
           echo "${{ secrets.DEPLOY_SERVER_SSH_KEY }}" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts
           ssh-keyscan ${{ inputs.ssh_host }} >> ~/.ssh/known_hosts
-          echo "Host bitbucket.org" >> ~/.ssh/config
-          echo "  IdentityFile ~/.ssh/id_bitbucket" >> ~/.ssh/config
-          echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
           echo "Host ${{ inputs.ssh_host }}" >> ~/.ssh/config
           echo "  IdentityFile ~/.ssh/id_deploy" >> ~/.ssh/config
           echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
