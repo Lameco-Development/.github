@@ -1,4 +1,4 @@
-# Use Tailwind CSS for styling.
+# Tailwind CSS Guidelines
 - If the project has a tailwind.config.js use Tailwind CSS v3 for styling
 - If the project doesn't have a tailwind.config.js but instead has a theme.scss use Tailwind CSS v4 for styling:
     - Define design tokens (colors, spacing, radii, fonts, etc.) inside a global `@theme {}` block in your CSS. Example:
