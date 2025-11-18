@@ -1,0 +1,12 @@
+# Javascript guidelines
+- Use Alpine.js for interactivity where necessary.
+- Use ES6+ features.
+- Use Typescript.
+- Use modules and import/export syntax.
+- Write modular and reusable code.
+- Use camelCase for variable and function names.
+- Use PascalCase for component names.
+- Use single quotes for strings.
+- Use arrow functions for callbacks.
+- Use async/await for asynchronous code.
+- Use const for constants and let for variables that will be reassigned.
