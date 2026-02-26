@@ -315,15 +315,40 @@ Event::on(Matrix::class, Matrix::EVENT_DEFINE_ENTRY_TYPES, static function (Defi
 4. **(Optional) Add native entry type grouping in Craft 5.8+**
    If the MatrixMate config had groups, use native Craft 5 grouping instead. Groups are stored as a per-field usage config — they go in the **field's** YAML (`config/project/fields/<fieldHandle>--<uid>.yaml`), not in the entry type YAML.
 
-   Find the field's YAML and add a `group` key next to each `uid` inside `settings.entryTypes`:
+   Find the field's YAML and add a `group` key to **every** entry type inside `settings.entryTypes`. The `group` value must be set on each entry type individually — entry types without an explicit `group` will appear under a "General" catch-all group.
+
+   The project config YAML uses `__assoc__` arrays. Add `group` as a second key-value pair alongside `uid` for every entry type:
 
    ```yaml
    settings:
      entryTypes:
-       - group: My Group Label
-         uid: <entryTypeUid>
-       - uid: <otherEntryTypeUid> # no group = ungrouped
+       -
+         __assoc__:
+           -
+             - uid
+             - <entryTypeUid> # firstBlockInGroupA
+           -
+             - group
+             - 'Group A Label'
+       -
+         __assoc__:
+           -
+             - uid
+             - <entryTypeUid> # secondBlockInGroupA
+           -
+             - group
+             - 'Group A Label'
+       -
+         __assoc__:
+           -
+             - uid
+             - <entryTypeUid> # firstBlockInGroupB
+           -
+             - group
+             - 'Group B Label'
    ```
+
+   > **⚠️ Important:** Every entry type must have `group` set. If you only set it on the first entry in a group, the rest will fall into a separate "General" group in the CP.
 
    Then run `php craft project-config/apply` to apply the changes.
 
@@ -374,11 +399,110 @@ php craft ckeditor/convert/redactor
 
 3. Run `php craft project-config/apply` to apply the converted fields and configs.
 
+3b. Update the auto-generated CKEditor configs to match the starter kit. The conversion command creates
+configs based on Redactor config names, but the settings need to be aligned with the standard starter
+kit configs.
+
+Find the YAML files under `config/project/ckeditor/configs/` whose `name:` matches **Title**,
+**Default**, and **Simple**, then replace their contents:
+
+**Title:**
+
+````yaml
+headingLevels:
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+name: Title
+toolbar:
+    - bold
+
+Simple:
+
+css: ".text-intro {\r\n  font-size: 120%;\r\n  line-height: 140%;\r\n}"
+headingLevels:
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+name: Simple
+options:
+    link:
+    addTargetToExternalLinks: false
+    decorators:
+        openInNewTab:
+        attributes:
+            rel: 'noopener noreferrer'
+            target: _blank
+        label: 'Open in a new tab'
+        mode: manual
+    style:
+    definitions:
+        -
+        classes:
+            - text-intro
+        element: p
+        name: Intro
+toolbar:
+    - heading
+    - style
+    - '|'
+    - bold
+    - italic
+    - link
+
+Default:
+
+css: ".text-intro {\r\n  font-size: 120%;\r\n  line-height: 140%;\r\n}"
+headingLevels:
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+name: Default
+options:
+    link:
+    addTargetToExternalLinks: false
+    decorators:
+        openInNewTab:
+        attributes:
+            rel: 'noopener noreferrer'
+            target: _blank
+        label: 'Open in a new tab'
+        mode: manual
+    style:
+    definitions:
+        -
+        classes:
+            - text-intro
+        element: p
+        name: Intro
+toolbar:
+    - heading
+    - style
+    - '|'
+    - bold
+    - underline
+    - italic
+    - strikethrough
+    - link
+    - subscript
+    - superscript
+    - '|'
+    - bulletedList
+    - numberedList
+    - outdent
+    - indent
+
 4. Remove the Redactor plugin:
 
 ```warp-runnable-command
 php craft plugin/uninstall redactor
-```
+````
 
 Remove `craftcms/redactor` from `composer.json`, then run:
 
