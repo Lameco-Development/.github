@@ -403,6 +403,22 @@ php craft ckeditor/convert/redactor
 configs based on Redactor config names, but the settings need to be aligned with the standard starter
 kit configs.
 
+> **⚠️ Important:** The converter creates configs based on the **actual Redactor config names** in the
+> project. These may not match the starter kit names "Title", "Default", and "Simple". For example,
+> a project may have had a "Typography" Redactor config instead of "Default", or a "Simple 2" auto-generated
+> duplicate if two different Redactor configs shared the same name.
+>
+> **What to do:**
+> 1. Run `ls config/project/ckeditor/configs/` and check each file's `name:` field.
+> 2. For each config, determine which starter kit name it maps to based on its toolbar/purpose:
+>    - A config used on **title/heading fields** with only `bold` → rename to **Title**
+>    - A config used on **simple content fields** with `heading`, `bold`, `italic`, `link` → rename to **Simple**
+>    - A config used on **rich content fields** with the full toolbar → rename to **Default**
+> 3. Replace the file contents with the corresponding starter kit config below.
+> 4. If the converter created a **duplicate name** (e.g. `"Simple 2"`), check which fields use it
+>    (`grep -r "<uid>" config/project/fields/`) and reassign each field to the correct standard config UID
+>    by updating `ckeConfig:` in each field's YAML.
+
 Find the YAML files under `config/project/ckeditor/configs/` whose `name:` matches **Title**,
 **Default**, and **Simple**, then replace their contents:
 
