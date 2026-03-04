@@ -120,7 +120,25 @@ The starter kit ships with the following shared fields. Reuse these before creat
 
 ---
 
-## Entries (CP sidebar grouping)
+## Entries over native element types
+
+In preparation for Craft 6 (which removes Globals, Categories and Tags as standalone element types), **always use Entries** instead of native Craft element types:
+
+| Instead of… | Use… |
+|---|---|
+| Globals | A **Single** section (e.g. `globalSettings`) |
+| Categories | A **Structure** section (max level 1 for flat lists, deeper for hierarchies) |
+| Tags | A **Channel** section with a single title field |
+
+- [ ] Do **not** create Category groups — use a Structure section with the `rectangle-history` icon instead.
+- [ ] Do **not** create Tag groups — use a Channel section with the `rectangle-history` icon instead.
+- [ ] Do **not** create Globals — use a Single section. The starter kit ships with a `globalSettings` single for this purpose; extend it before creating a new one.
+- [ ] Relate entries to other entries using a **Entries** relational field, not `craft\fields\Categories` or `craft\fields\Tags`.
+- [ ] Group these "taxonomy" sections under the **"Elements"** heading in the CP sidebar.
+
+---
+
+
 
 - [ ] Entries **without** a URI format are grouped under a heading called **"Elements"**.
 - [ ] Entries **with** a URI format are grouped under a heading called **"Pages"**.
