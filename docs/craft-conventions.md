@@ -90,11 +90,20 @@ The starter kit ships with the following shared fields. Reuse these before creat
 - [ ] `showSlugField: false`, `showStatusField: false`, `hasTitleField: false` (use `titleFormat` for CP label).
 - [ ] Decide whether the **Title** field should be required (set accordingly).
 - [ ] Add an **"Anchor"** tab with a Template field pointing to `lameco/helper/anchor/cp.twig`.
+- [ ] **Sort** block entry types alphabetically in the `pageBuilder` Matrix field's `entryTypes` list.
 
 ### Reusable / Element entry types (no URI)
 
 - [ ] Icon: `rectangle-history`.
 - [ ] `showSlugField: false`, `showStatusField: false` (unless status control is needed).
+
+---
+
+## Sorting
+
+- [ ] **Page Builder blocks** (`entryTypes` inside the `pageBuilder` Matrix field) — sorted **alphabetically** by name.
+- [ ] **Sections** in the CP sidebar — sorted **alphabetically** within each group (Pages, Elements, Categories).
+- [ ] **Entry type fields** within a field layout — ordered logically (title/identifier first, then content fields, supporting fields last), not alphabetically.
 
 ---
 
