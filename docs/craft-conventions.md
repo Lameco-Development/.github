@@ -132,6 +132,7 @@ The starter kit ships with the following shared fields. Reuse these before creat
 
 - [ ] Add **image transforms** for all image fields used in templates.
 - [ ] Add the **preferred dimensions** of an image to the field instructions (e.g. `1920 × 1080 px`).
+- [ ] **Videos** are embedded via the `spicyweb/craft-embedded-assets` plugin (YouTube / Vimeo). Do **not** create Assets fields that accept video file uploads (`mp4`, `webm`, etc.). Video fields must use `allowedKinds: [json]` to accept embedded asset JSON files.
 
 ---
 
