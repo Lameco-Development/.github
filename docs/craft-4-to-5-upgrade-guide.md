@@ -168,8 +168,13 @@ Some plugins are abandoned or not available for Craft 5 and need to be removed/m
    - Do this for **all** plugins (not for non-plugin packages like `vlucas/phpdotenv` or `erusev/parsedown`).
    - **Exception — `sebastianlenz/linkfield`:** The stable releases of this plugin only support Craft 4. Set it explicitly to `"3.0.0-beta"` instead of `"*"`, as that is the Craft 5-compatible beta release:
      `"sebastianlenz/linkfield": "3.0.0-beta"`
-6. Run `composer update -W` (the `-W` flag allows upgrades/downgrades of dependencies to resolve version conflicts).
-7. After the update succeeds, pin all plugin versions back to their resolved versions from `composer.lock` to prevent unintended future updates. Run the following script to do this automatically:
+6. Check if `lameco/craft-twig-components` exists in `composer.json` with a version lower than `1.x`. If so, add the following inline aliases to `composer.json` under `require` to satisfy its dependencies:
+   ```json
+   "performing/twig-components": "0.7.0 as 0.6.9",
+   "voku/portable-utf8": "dev-master#c4b3774 as 6.0.13",
+   ```
+7. Run `composer update -W` (the `-W` flag allows upgrades/downgrades of dependencies to resolve version conflicts).
+8. After the update succeeds, pin all plugin versions back to their resolved versions from `composer.lock` to prevent unintended future updates. Run the following script to do this automatically:
 
 ```bash
 php -r "
@@ -193,8 +198,8 @@ echo 'Done.' . PHP_EOL;
 
 - This only pins packages that were set to `*` — range constraints like `^5.0.0` are left untouched.
 
-8. Run `php craft up` to apply all migrations.
-9. Commit only the relevant files — **do not use `git add -A`** as it would accidentally include the upgrade guide and other untracked files:
+9. Run `php craft up` to apply all migrations.
+10. Commit only the relevant files — **do not use `git add -A`** as it would accidentally include the upgrade guide and other untracked files:
 
 ```warp-runnable-command
 git add config/ modules/ composer.json composer.lock
