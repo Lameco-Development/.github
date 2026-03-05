@@ -11,56 +11,73 @@ jobs:
       contents: read
 
     steps:
-      - name: Detect craftcms/cms version change
-        id: versions
-        uses: actions/github-script@v7
+      - uses: actions/checkout@v4
         with:
-          script: |
-            const files = await github.rest.pulls.listFiles({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number,
-            });
+          fetch-depth: 0
 
-            const lock = files.data.find(f => f.filename === 'composer.lock');
-            if (!lock || !lock.patch) {
-              console.log('No composer.lock changes found, skipping.');
-              return core.setOutput('skip', 'true');
-            }
-
-            const patch = lock.patch;
-
-            // Extract old/new craftcms/cms version from the unified diff
-            const oldMatch = patch.match(/-\s*"name": "craftcms\/cms"[\s\S]*?-\s*"version": "([^"]+)"/m);
-            const newMatch = patch.match(/\+\s*"name": "craftcms\/cms"[\s\S]*?\+\s*"version": "([^"]+)"/m);
-
-            if (!oldMatch || !newMatch) {
-              console.log('craftcms/cms version unchanged, skipping.');
-              return core.setOutput('skip', 'true');
-            }
-
-            const oldVersion = oldMatch[1].replace(/^v/, '');
-            const newVersion = newMatch[1].replace(/^v/, '');
-            console.log(`craftcms/cms: ${oldVersion} → ${newVersion}`);
-
-            core.setOutput('old_version', oldVersion);
-            core.setOutput('new_version', newVersion);
-
-      - name: Parse Craft changelog for notices and security fixes
-        if: steps.versions.outputs.skip != 'true'
+      - name: Compare composer.lock and parse changelogs
         id: parse
         uses: actions/github-script@v7
-        env:
-          OLD_VERSION: ${{ steps.versions.outputs.old_version }}
-          NEW_VERSION: ${{ steps.versions.outputs.new_version }}
         with:
           script: |
-            const { OLD_VERSION, NEW_VERSION } = process.env;
+            const { execSync } = require('child_process');
+            const fs = require('fs');
 
-            const res = await fetch('https://raw.githubusercontent.com/craftcms/cms/develop/CHANGELOG.md');
-            if (!res.ok) throw new Error(`Failed to fetch CHANGELOG.md: ${res.status}`);
-            const changelog = await res.text();
+            // ── 1. Load old and new composer.lock ────────────────────────────
+            const baseBranch = context.payload.pull_request.base.ref;
+            execSync(`git fetch origin ${baseBranch} --depth=1`);
 
+            let oldLockContent;
+            try {
+              oldLockContent = execSync(`git show origin/${baseBranch}:composer.lock`).toString();
+            } catch {
+              console.log('No composer.lock on base branch, skipping.');
+              return core.setOutput('skip', 'true');
+            }
+
+            const newLockContent = fs.readFileSync('composer.lock', 'utf8');
+            const oldLock = JSON.parse(oldLockContent);
+            const newLock = JSON.parse(newLockContent);
+
+            function buildMap(lock) {
+              const map = {};
+              for (const pkg of [...(lock.packages || []), ...(lock['packages-dev'] || [])]) {
+                map[pkg.name] = {
+                  version: pkg.version.replace(/^v/, ''),
+                  source: pkg.source,
+                };
+              }
+              return map;
+            }
+
+            const oldMap = buildMap(oldLock);
+            const newMap = buildMap(newLock);
+
+            // ── 2. Find updated packages that have a GitHub source URL ───────
+            const updated = [];
+            for (const [name, newPkg] of Object.entries(newMap)) {
+              const oldPkg = oldMap[name];
+              if (!oldPkg || oldPkg.version === newPkg.version) continue;
+
+              const sourceUrl = newPkg.source?.url || '';
+              const ghMatch = sourceUrl.match(/github\.com[:/]([^/]+)\/([^/.]+)(\.git)?$/);
+              if (!ghMatch) continue;
+
+              updated.push({
+                name,
+                oldVersion: oldPkg.version,
+                newVersion: newPkg.version,
+                ghOwner: ghMatch[1],
+                ghRepo: ghMatch[2],
+              });
+            }
+
+            if (!updated.length) {
+              console.log('No packages with GitHub sources updated.');
+              return core.setOutput('skip', 'true');
+            }
+
+            // ── 3. Changelog helpers ─────────────────────────────────────────
             function isNewerVersion(a, b) {
               const pa = a.split('.').map(Number);
               const pb = b.split('.').map(Number);
@@ -71,97 +88,138 @@ jobs:
               return false;
             }
 
-            // Collect all version blocks strictly between OLD_VERSION (exclusive) and NEW_VERSION (inclusive)
-            const sections = [];
-            const lines = changelog.split('\n');
-            let inRange = false;
-            let currentVersion = null;
-            let currentLines = [];
+            function parseChangelog(changelog, oldVersion, newVersion) {
+              const lines = changelog.split('\n');
+              const sections = [];
+              let inRange = false;
+              let currentVersion = null;
+              let currentLines = [];
 
-            for (const line of lines) {
-              const match = line.match(/^## (\d+\.\d+\.\d+) - /);
-              if (match) {
-                if (inRange && currentLines.length) {
-                  sections.push({ version: currentVersion, lines: [...currentLines] });
-                }
-                currentVersion = match[1];
-                currentLines = [];
-                inRange =
-                  isNewerVersion(currentVersion, OLD_VERSION) &&
-                  (isNewerVersion(NEW_VERSION, currentVersion) || currentVersion === NEW_VERSION);
-              } else if (inRange) {
-                currentLines.push(line);
-              }
-            }
-            // Push last collected section
-            if (inRange && currentLines.length) {
-              sections.push({ version: currentVersion, lines: currentLines });
-            }
-
-            const notices = [];
-            const security = [];
-
-            for (const { version, lines: vlines } of sections) {
-              for (let i = 0; i < vlines.length; i++) {
-                const line = vlines[i];
-
-                // GitHub admonition blocks: > [!WARNING], > [!NOTE], > [!CAUTION], > [!IMPORTANT]
-                const admonitionMatch = line.match(/^>\s*\[!(WARNING|NOTE|CAUTION|IMPORTANT)\]/i);
-                if (admonitionMatch) {
-                  const type = admonitionMatch[1].toUpperCase();
-                  // Collect all continuation lines (lines starting with ">")
-                  const msgLines = [];
-                  let j = i + 1;
-                  while (j < vlines.length && /^>\s*/.test(vlines[j])) {
-                    const content = vlines[j].replace(/^>\s*/, '').trim();
-                    if (content) msgLines.push(content);
-                    j++;
+              for (const line of lines) {
+                // Match common heading formats: ## 1.2.3, ## v1.2.3, ## 1.2.3 - date
+                const match = line.match(/^##\s+v?(\d+\.\d+\.\d+)/);
+                if (match) {
+                  if (inRange && currentLines.length) {
+                    sections.push({ version: currentVersion, lines: [...currentLines] });
                   }
-                  if (msgLines.length) {
-                    notices.push(`**${version} [${type}]:** ${msgLines.join(' ')}`);
-                  }
-                  continue;
-                }
-
-                // Legacy inline > **Note:** style
-                if (/^>\s*\*{0,2}Note:/i.test(line)) {
-                  const msg = line.replace(/^>\s*\*{0,2}Note:\*{0,2}\s*/i, '').trim();
-                  if (msg) notices.push(`**${version} [NOTE]:** ${msg}`);
-                  continue;
-                }
-
-                // Security severity lines
-                if (/\[critical-severity\]|\[high-severity\]|\[moderate-severity\]/i.test(line)) {
-                  security.push(`**${version}:** ${line.replace(/^-\s*/, '').trim()}`);
+                  currentVersion = match[1];
+                  currentLines = [];
+                  inRange =
+                    isNewerVersion(currentVersion, oldVersion) &&
+                    (isNewerVersion(newVersion, currentVersion) || currentVersion === newVersion);
+                } else if (inRange) {
+                  currentLines.push(line);
                 }
               }
+              if (inRange && currentLines.length) {
+                sections.push({ version: currentVersion, lines: currentLines });
+              }
+
+              const notices = [];
+              const security = [];
+
+              for (const { version, lines: vlines } of sections) {
+                for (let i = 0; i < vlines.length; i++) {
+                  const line = vlines[i];
+
+                  // GitHub admonition blocks: > [!WARNING], > [!NOTE], > [!CAUTION], > [!IMPORTANT]
+                  const admonitionMatch = line.match(/^>\s*\[!(WARNING|NOTE|CAUTION|IMPORTANT)\]/i);
+                  if (admonitionMatch) {
+                    const type = admonitionMatch[1].toUpperCase();
+                    const msgLines = [];
+                    let j = i + 1;
+                    while (j < vlines.length && /^>\s*/.test(vlines[j])) {
+                      const content = vlines[j].replace(/^>\s*/, '').trim();
+                      if (content) msgLines.push(content);
+                      j++;
+                    }
+                    if (msgLines.length) notices.push(`**${version} [${type}]:** ${msgLines.join(' ')}`);
+                    continue;
+                  }
+
+                  // Legacy inline > **Note:** style
+                  if (/^>\s*\*{0,2}Note:/i.test(line)) {
+                    const msg = line.replace(/^>\s*\*{0,2}Note:\*{0,2}\s*/i, '').trim();
+                    if (msg) notices.push(`**${version} [NOTE]:** ${msg}`);
+                    continue;
+                  }
+
+                  // Security severity lines (Craft CMS convention)
+                  if (/\[critical-severity\]|\[high-severity\]|\[moderate-severity\]/i.test(line)) {
+                    security.push(`**${version}:** ${line.replace(/^-\s*/, '').trim()}`);
+                  }
+                }
+              }
+
+              return { notices, security };
             }
 
-            // Build PR comment
-            let comment = `## 🔍 Craft CMS Update: \`${OLD_VERSION}\` → \`${NEW_VERSION}\`\n\n`;
+            // ── 4. Process each updated package ─────────────────────────────
+            let commentSections = [];
+            const allUpdated = [];
 
-            if (security.length) {
-              comment += `### 🔒 Security Fixes\n`;
-              comment += security.map(l => `- ${l}`).join('\n');
-              comment += '\n\n';
+            for (const pkg of updated) {
+              const { name, oldVersion, newVersion, ghOwner, ghRepo } = pkg;
+              allUpdated.push(pkg);
+
+              // Try common default branch names
+              let changelog = null;
+              for (const branch of ['main', 'master', 'develop']) {
+                try {
+                  const res = await fetch(
+                    `https://raw.githubusercontent.com/${ghOwner}/${ghRepo}/${branch}/CHANGELOG.md`
+                  );
+                  if (res.ok) { changelog = await res.text(); break; }
+                } catch {}
+              }
+
+              if (!changelog) {
+                commentSections.push(
+                  `### 📦 \`${name}\`: \`${oldVersion}\` → \`${newVersion}\`\n` +
+                  `_No CHANGELOG.md found — check [releases](https://github.com/${ghOwner}/${ghRepo}/releases) manually._`
+                );
+                continue;
+              }
+
+              const { notices, security } = parseChangelog(changelog, oldVersion, newVersion);
+
+              // Only add a section if there is something worth flagging
+              if (!notices.length && !security.length) continue;
+
+              let section = `### 📦 \`${name}\`: \`${oldVersion}\` → \`${newVersion}\`\n`;
+              if (security.length) {
+                section += `**🔒 Security Fixes:**\n${security.map(l => `- ${l}`).join('\n')}\n\n`;
+              }
+              if (notices.length) {
+                section += `**⚠️ Notices & Breaking Changes:**\n${notices.map(l => `- ${l}`).join('\n')}\n`;
+              }
+              commentSections.push(section);
             }
 
-            if (notices.length) {
-              comment += `### ⚠️ Notices & Breaking Changes\n`;
-              comment += notices.map(l => `- ${l}`).join('\n');
-              comment += '\n\n';
+            if (!commentSections.length && !allUpdated.length) {
+              return core.setOutput('skip', 'true');
             }
 
-            if (!security.length && !notices.length) {
-              comment += `✅ No security advisories or breaking change notices found between these versions.\n`;
+            // ── 5. Build final comment ────────────────────────────────────────
+            let comment = `## 🔍 Craft Package Updates\n\n`;
+
+            if (commentSections.length) {
+              comment += commentSections.join('\n---\n') + '\n\n';
+            } else {
+              comment += `✅ No security advisories or breaking change notices found.\n\n`;
             }
 
-            comment += `\n---\n> 📋 Review the [full changelog](https://github.com/craftcms/cms/blob/develop/CHANGELOG.md) before merging.`;
+            // Summary table of every updated package
+            comment += `---\n### 📋 All updated packages\n`;
+            comment += `| Package | From | To | Changelog |\n|---|---|---|---|\n`;
+            for (const { name, oldVersion, newVersion, ghOwner, ghRepo } of allUpdated) {
+              comment += `| \`${name}\` | \`${oldVersion}\` | \`${newVersion}\` | [View](https://github.com/${ghOwner}/${ghRepo}/blob/main/CHANGELOG.md) |\n`;
+            }
 
             core.setOutput('comment', comment);
 
       - name: Post comment on PR
-        if: steps.versions.outputs.skip != 'true'
+        if: steps.parse.outputs.skip != 'true'
         uses: actions/github-script@v7
         with:
           script: |

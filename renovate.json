@@ -5,9 +5,32 @@
   "schedule": ["on the first day of the month"],
   "packageRules": [
     {
-      "description": "Craft CMS and first-party plugins — group into one PR per month",
+      "description": "Craft CMS core, Commerce, and all first-party plugins",
       "matchPackagePatterns": ["^craftcms/"],
-      "groupName": "Craft CMS & plugins",
+      "groupName": "Craft CMS",
+      "automerge": false,
+      "prBodyNotes": [
+        "⚠️ **A bot will automatically comment on this PR with any security advisories, notices, or breaking changes detected in the changelog.**"
+      ]
+    },
+    {
+      "description": "Third-party Craft plugins — group into one monthly PR",
+      "matchPackagePatterns": [
+        "^verbb/",
+        "^ether/",
+        "^nystudio107/",
+        "^putyourlightson/",
+        "^spicyweb/",
+        "^doublesecretagency/",
+        "^carlcs/",
+        "^fruitstudios/",
+        "^venveo/",
+        "^ryanirelan/",
+        "^ostark/",
+        "^mmikkel/",
+        "^markhuot/"
+      ],
+      "groupName": "Craft plugins",
       "automerge": false,
       "prBodyNotes": [
         "⚠️ **A bot will automatically comment on this PR with any security advisories, notices, or breaking changes detected in the changelog.**"
