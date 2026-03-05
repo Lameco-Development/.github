@@ -404,120 +404,121 @@ php craft ckeditor/convert/redactor
 
 3. Run `php craft project-config/apply` to apply the converted fields and configs.
 
-3b. Update the auto-generated CKEditor configs to match the starter kit. The conversion command creates
-configs based on Redactor config names, but the settings need to be aligned with the standard starter
-kit configs.
+3b. Update the auto-generated CKEditor configs to match the starter kit. Since CKEditor v5.x,
+the configuration is no longer stored in separate config files but is embedded directly in each
+field's YAML under `config/project/fields/`.
 
-> **⚠️ Important:** The converter creates configs based on the **actual Redactor config names** in the
+> **⚠️ Important:** The converter migrates settings based on the **actual Redactor config names** in the
 > project. These may not match the starter kit names "Title", "Default", and "Simple". For example,
-> a project may have had a "Typography" Redactor config instead of "Default", or a "Simple 2" auto-generated
-> duplicate if two different Redactor configs shared the same name.
+> a project may have had a "Typography" Redactor config instead of "Default".
 >
 > **What to do:**
-> 1. Run `ls config/project/ckeditor/configs/` and check each file's `name:` field.
-> 2. For each config, determine which starter kit name it maps to based on its toolbar/purpose:
->    - A config used on **title/heading fields** with only `bold` → rename to **Title**
->    - A config used on **simple content fields** with `heading`, `bold`, `italic`, `link` → rename to **Simple**
->    - A config used on **rich content fields** with the full toolbar → rename to **Default**
-> 3. Replace the file contents with the corresponding starter kit config below.
-> 4. If the converter created a **duplicate name** (e.g. `"Simple 2"`), check which fields use it
->    (`grep -r "<uid>" config/project/fields/`) and reassign each field to the correct standard config UID
->    by updating `ckeConfig:` in each field's YAML.
+> 1. Find the CKEditor fields in `config/project/fields/` and inspect each file's `settings.toolbar:` value.
+> 2. For each field, determine which starter kit config applies based on its purpose:
+>    - A field used on **title/heading content** with only `bold` → apply **Title** settings
+>    - A field used on **simple content** with `heading`, `bold`, `italic`, `link` → apply **Simple** settings
+>    - A field used on **rich content** with the full toolbar → apply **Default** settings
+> 3. Replace the relevant keys inside `settings:` with the corresponding starter kit values below.
 
-Find the YAML files under `config/project/ckeditor/configs/` whose `name:` matches **Title**,
-**Default**, and **Simple**, then replace their contents:
+Open each CKEditor field file under `config/project/fields/` and update the `settings:` block
+to match one of the following starter kit configs:
 
-**Title:**
+**Title** — fields used for title/heading content:
 
-````yaml
-headingLevels:
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
-name: Title
-toolbar:
-    - bold
+```yaml
+settings:
+    headingLevels:
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+    toolbar:
+        - bold
+```
 
-Simple:
+**Simple** — fields used for lightweight rich text:
 
-css: ".text-intro {\r\n  font-size: 120%;\r\n  line-height: 140%;\r\n}"
-headingLevels:
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
-name: Simple
-options:
-    link:
-    addTargetToExternalLinks: false
-    decorators:
-        openInNewTab:
-        attributes:
-            rel: 'noopener noreferrer'
-            target: _blank
-        label: 'Open in a new tab'
-        mode: manual
-    style:
-    definitions:
-        -
-        classes:
-            - text-intro
-        element: p
-        name: Intro
-toolbar:
-    - heading
-    - style
-    - '|'
-    - bold
-    - italic
-    - link
+```yaml
+settings:
+    css: ".text-intro {\r\n  font-size: 120%;\r\n  line-height: 140%;\r\n}"
+    headingLevels:
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+    options:
+        link:
+            addTargetToExternalLinks: false
+            decorators:
+                openInNewTab:
+                    attributes:
+                        rel: 'noopener noreferrer'
+                        target: _blank
+                    label: 'Open in a new tab'
+                    mode: manual
+        style:
+            definitions:
+                -
+                    classes:
+                        - text-intro
+                    element: p
+                    name: Intro
+    toolbar:
+        - heading
+        - style
+        - '|'
+        - bold
+        - italic
+        - link
+```
 
-Default:
+**Default** — fields used for full rich text editing:
 
-css: ".text-intro {\r\n  font-size: 120%;\r\n  line-height: 140%;\r\n}"
-headingLevels:
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
-name: Default
-options:
-    link:
-    addTargetToExternalLinks: false
-    decorators:
-        openInNewTab:
-        attributes:
-            rel: 'noopener noreferrer'
-            target: _blank
-        label: 'Open in a new tab'
-        mode: manual
-    style:
-    definitions:
-        -
-        classes:
-            - text-intro
-        element: p
-        name: Intro
-toolbar:
-    - heading
-    - style
-    - '|'
-    - bold
-    - underline
-    - italic
-    - strikethrough
-    - link
-    - subscript
-    - superscript
-    - '|'
-    - bulletedList
-    - numberedList
-    - outdent
-    - indent
+```yaml
+settings:
+    css: ".text-intro {\r\n  font-size: 120%;\r\n  line-height: 140%;\r\n}"
+    headingLevels:
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+    options:
+        link:
+            addTargetToExternalLinks: false
+            decorators:
+                openInNewTab:
+                    attributes:
+                        rel: 'noopener noreferrer'
+                        target: _blank
+                    label: 'Open in a new tab'
+                    mode: manual
+        style:
+            definitions:
+                -
+                    classes:
+                        - text-intro
+                    element: p
+                    name: Intro
+    toolbar:
+        - heading
+        - style
+        - '|'
+        - bold
+        - underline
+        - italic
+        - strikethrough
+        - link
+        - subscript
+        - superscript
+        - '|'
+        - bulletedList
+        - numberedList
+        - outdent
+        - indent
+```
 
 4. Remove the Redactor plugin:
 
