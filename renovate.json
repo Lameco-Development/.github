@@ -1,0 +1,17 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:base"],
+  "fetchChangelogs": "pr",
+  "schedule": ["on the first day of the month"],
+  "packageRules": [
+    {
+      "description": "Craft CMS and first-party plugins — group into one PR per month",
+      "matchPackagePatterns": ["^craftcms/"],
+      "groupName": "Craft CMS & plugins",
+      "automerge": false,
+      "prBodyNotes": [
+        "⚠️ **A bot will automatically comment on this PR with any security advisories, notices, or breaking changes detected in the changelog.**"
+      ]
+    }
+  ]
+}

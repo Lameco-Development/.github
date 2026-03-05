@@ -1,0 +1,176 @@
+name: Craft Update Notices
+
+on:
+  workflow_call:
+
+jobs:
+  check-changelog:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Detect craftcms/cms version change
+        id: versions
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const files = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+
+            const lock = files.data.find(f => f.filename === 'composer.lock');
+            if (!lock || !lock.patch) {
+              console.log('No composer.lock changes found, skipping.');
+              return core.setOutput('skip', 'true');
+            }
+
+            const patch = lock.patch;
+
+            // Extract old/new craftcms/cms version from the unified diff
+            const oldMatch = patch.match(/-\s*"name": "craftcms\/cms"[\s\S]*?-\s*"version": "([^"]+)"/m);
+            const newMatch = patch.match(/\+\s*"name": "craftcms\/cms"[\s\S]*?\+\s*"version": "([^"]+)"/m);
+
+            if (!oldMatch || !newMatch) {
+              console.log('craftcms/cms version unchanged, skipping.');
+              return core.setOutput('skip', 'true');
+            }
+
+            const oldVersion = oldMatch[1].replace(/^v/, '');
+            const newVersion = newMatch[1].replace(/^v/, '');
+            console.log(`craftcms/cms: ${oldVersion} → ${newVersion}`);
+
+            core.setOutput('old_version', oldVersion);
+            core.setOutput('new_version', newVersion);
+
+      - name: Parse Craft changelog for notices and security fixes
+        if: steps.versions.outputs.skip != 'true'
+        id: parse
+        uses: actions/github-script@v7
+        env:
+          OLD_VERSION: ${{ steps.versions.outputs.old_version }}
+          NEW_VERSION: ${{ steps.versions.outputs.new_version }}
+        with:
+          script: |
+            const { OLD_VERSION, NEW_VERSION } = process.env;
+
+            const res = await fetch('https://raw.githubusercontent.com/craftcms/cms/develop/CHANGELOG.md');
+            if (!res.ok) throw new Error(`Failed to fetch CHANGELOG.md: ${res.status}`);
+            const changelog = await res.text();
+
+            function isNewerVersion(a, b) {
+              const pa = a.split('.').map(Number);
+              const pb = b.split('.').map(Number);
+              for (let i = 0; i < 3; i++) {
+                if (pa[i] > pb[i]) return true;
+                if (pa[i] < pb[i]) return false;
+              }
+              return false;
+            }
+
+            // Collect all version blocks strictly between OLD_VERSION (exclusive) and NEW_VERSION (inclusive)
+            const sections = [];
+            const lines = changelog.split('\n');
+            let inRange = false;
+            let currentVersion = null;
+            let currentLines = [];
+
+            for (const line of lines) {
+              const match = line.match(/^## (\d+\.\d+\.\d+) - /);
+              if (match) {
+                if (inRange && currentLines.length) {
+                  sections.push({ version: currentVersion, lines: [...currentLines] });
+                }
+                currentVersion = match[1];
+                currentLines = [];
+                inRange =
+                  isNewerVersion(currentVersion, OLD_VERSION) &&
+                  (isNewerVersion(NEW_VERSION, currentVersion) || currentVersion === NEW_VERSION);
+              } else if (inRange) {
+                currentLines.push(line);
+              }
+            }
+            // Push last collected section
+            if (inRange && currentLines.length) {
+              sections.push({ version: currentVersion, lines: currentLines });
+            }
+
+            const notices = [];
+            const security = [];
+
+            for (const { version, lines: vlines } of sections) {
+              for (let i = 0; i < vlines.length; i++) {
+                const line = vlines[i];
+
+                // GitHub admonition blocks: > [!WARNING], > [!NOTE], > [!CAUTION], > [!IMPORTANT]
+                const admonitionMatch = line.match(/^>\s*\[!(WARNING|NOTE|CAUTION|IMPORTANT)\]/i);
+                if (admonitionMatch) {
+                  const type = admonitionMatch[1].toUpperCase();
+                  // Collect all continuation lines (lines starting with ">")
+                  const msgLines = [];
+                  let j = i + 1;
+                  while (j < vlines.length && /^>\s*/.test(vlines[j])) {
+                    const content = vlines[j].replace(/^>\s*/, '').trim();
+                    if (content) msgLines.push(content);
+                    j++;
+                  }
+                  if (msgLines.length) {
+                    notices.push(`**${version} [${type}]:** ${msgLines.join(' ')}`);
+                  }
+                  continue;
+                }
+
+                // Legacy inline > **Note:** style
+                if (/^>\s*\*{0,2}Note:/i.test(line)) {
+                  const msg = line.replace(/^>\s*\*{0,2}Note:\*{0,2}\s*/i, '').trim();
+                  if (msg) notices.push(`**${version} [NOTE]:** ${msg}`);
+                  continue;
+                }
+
+                // Security severity lines
+                if (/\[critical-severity\]|\[high-severity\]|\[moderate-severity\]/i.test(line)) {
+                  security.push(`**${version}:** ${line.replace(/^-\s*/, '').trim()}`);
+                }
+              }
+            }
+
+            // Build PR comment
+            let comment = `## 🔍 Craft CMS Update: \`${OLD_VERSION}\` → \`${NEW_VERSION}\`\n\n`;
+
+            if (security.length) {
+              comment += `### 🔒 Security Fixes\n`;
+              comment += security.map(l => `- ${l}`).join('\n');
+              comment += '\n\n';
+            }
+
+            if (notices.length) {
+              comment += `### ⚠️ Notices & Breaking Changes\n`;
+              comment += notices.map(l => `- ${l}`).join('\n');
+              comment += '\n\n';
+            }
+
+            if (!security.length && !notices.length) {
+              comment += `✅ No security advisories or breaking change notices found between these versions.\n`;
+            }
+
+            comment += `\n---\n> 📋 Review the [full changelog](https://github.com/craftcms/cms/blob/develop/CHANGELOG.md) before merging.`;
+
+            core.setOutput('comment', comment);
+
+      - name: Post comment on PR
+        if: steps.versions.outputs.skip != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = process.env.COMMENT;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: comment,
+            });
+        env:
+          COMMENT: ${{ steps.parse.outputs.comment }}
