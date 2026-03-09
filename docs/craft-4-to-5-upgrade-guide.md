@@ -899,19 +899,38 @@ class m250305_135052_typed_link_field_to_craft_link_field extends Migration
 }
 ```
 
-1. Run the migration:
+1. Run an AI agent to inspect the actual Lenz field configurations in this project and update the `typeMapping` and `allowedTypes` in the migration to match:
+
+```warp-runnable-command
+claude "Read migrations/m250305_135052_typed_link_field_to_craft_link_field.php. Then run the following PHP snippet to inspect the actual Lenz fields and all distinct type values used in content:
+
+php -r \"
+\\\$db = new PDO('mysql:host=127.0.0.1;dbname=' . getenv('CRAFT_DB_DATABASE'), getenv('CRAFT_DB_USER'), getenv('CRAFT_DB_PASSWORD'));
+\\\$fields = \\\$db->query(\\\"SELECT handle, settings FROM craft_fields WHERE type IN ('typedlinkfield\\\\\\\fields\\\\\\\LinkField','lenz\\\\\\\linkfield\\\\\\\fields\\\\\\\LinkField')\\\")->fetchAll(PDO::FETCH_ASSOC);
+foreach (\\\$fields as \\\$f) {
+    \\\$s = json_decode(\\\$f['settings'], true);
+    echo \\\$f['handle'] . ': enabled types = ' . implode(', ', array_keys(array_filter(\\\$s['typeSettings'] ?? [], fn(\\\$t) => !empty(\\\$t['enabled'])))) . PHP_EOL;
+}
+\\\$types = \\\$db->query('SELECT DISTINCT type FROM craft_lenz_linkfield')->fetchAll(PDO::FETCH_COLUMN);
+echo 'Content types in lenz_linkfield table: ' . implode(', ', \\\$types) . PHP_EOL;
+\"
+
+Based on the output: update the \$typeMapping array so every type name found in the fields settings and the lenz_linkfield table has an explicit mapping to a native Craft Link type (entry, asset, category, url, email, tel). Also update \$allowedTypes to include every type that appears in the content. If any type names are custom/unknown, map them to the closest native type and add a comment explaining the mapping."
+```
+
+2. Run the migration:
 
 ```warp-runnable-command
 php craft migrate/up m250305_135052_typed_link_field_to_craft_link_field
 ```
 
-2. Rebuild project config to capture the field type changes:
+3. Rebuild project config to capture the field type changes:
 
 ```warp-runnable-command
 php craft project-config/rebuild
 ```
 
-3. Remove the `lenz_linkfield` table from the database:
+4. Remove the `lenz_linkfield` table from the database:
 
 ```warp-runnable-command
 mysql -u root -proot <database_name> -e "DROP TABLE IF EXISTS lenz_linkfield;"
@@ -919,13 +938,13 @@ mysql -u root -proot <database_name> -e "DROP TABLE IF EXISTS lenz_linkfield;"
 
 > **Note:** Replace `root`/`root` and `<database_name>` with your actual DB credentials from `.env` (`CRAFT_DB_USER`, `CRAFT_DB_PASSWORD`, `CRAFT_DB_DATABASE`). Craft does not have a built-in `db/run-sql` command.
 
-4. Remove the migration file:
+5. Remove the migration file:
 
 ```warp-runnable-command
 rm migrations/m250305_135052_typed_link_field_to_craft_link_field.php
 ```
 
-5. Uninstall the plugin and remove it from `composer.json`:
+6. Uninstall the plugin and remove it from `composer.json`:
 
 ```warp-runnable-command
 php craft plugin/uninstall typedlinkfield
@@ -937,7 +956,7 @@ Remove `sebastianlenz/linkfield` from `composer.json`, then run:
 composer update sebastianlenz/linkfield --no-interaction
 ```
 
-6. Update templates — search for all Link field usages and update the API calls:
+7. Update templates — search for all Link field usages and update the API calls:
 
 | Old (Typed Link Field)        | New (native Craft Link) |
 | ----------------------------- | ----------------------- |
@@ -949,7 +968,7 @@ composer update sebastianlenz/linkfield --no-interaction
 
 > **Note:** Twig property access (`.isEmpty` without parens) will also call `isEmpty()` under the hood. Remove any remaining `and not %field%.isEmpty` conditions — they are redundant if `%field% is not empty` is already checked in the same condition.
 
-7. Commit:
+8. Commit:
 
 ```warp-runnable-command
 git add migrations/ templates/ composer.json composer.lock config/project/
