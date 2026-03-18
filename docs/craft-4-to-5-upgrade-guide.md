@@ -1145,3 +1145,28 @@ Blitz's query string parameter configuration may differ between environments. Af
 ```warp-runnable-command
 php craft blitz/cache/clear && php craft blitz/cache/warm
 ```
+
+---
+
+## Step 21: Review Craft Commerce user group permissions (if Commerce is installed)
+
+> **Only applies if:** `craftcms/commerce` is in `composer.json`
+
+Commerce 5 introduced new and more granular permission scopes. User groups carried over from Commerce 4 may not have the expected capabilities after the upgrade, so review all Commerce-related groups.
+
+1. In the Craft control panel, go to **Settings → Users → User Groups**.
+2. Open each group that should access Commerce and verify **Access the control panel → Access Craft Commerce** is enabled.
+3. In the **Commerce** permission section, review role-appropriate permissions for each group:
+    - **Manage _Product Type Name_ products** (per product type)
+    - **Manage orders**, including **Edit orders**, **Delete orders**, **Capture payment**, and **Refund payment**
+    - **Manage inventory stock levels**, **Manage inventory locations**, and **Manage inventory transfers** (if inventory is used)
+    - **Manage store settings**, including **Store general settings**, **Payment currencies**, **Manage shipping**, **Manage taxes**, and **Manage promotions** (Sales, Catalog Pricing Rules, Discounts)
+    - **Manage subscriptions** and **Manage subscription plans** (if subscriptions are used)
+    - **Manage donation settings** (if donations are used)
+4. Validate access by testing with a representative user from each group and confirm critical workflows still work (product updates, order edits, payment capture/refunds, promotion updates).
+5. Record any permission changes in the project handover notes so production user groups can be updated consistently.
+
+Reference:
+
+- Commerce 5 permissions: https://craftcms.com/docs/commerce/5.x/reference/permissions.html
+- Commerce 4 → 5 upgrade notes: https://craftcms.com/docs/commerce/5.x/upgrade.html
