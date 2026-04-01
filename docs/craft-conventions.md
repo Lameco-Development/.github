@@ -71,6 +71,7 @@ The starter kit ships with the following shared fields. Reuse these before creat
 
 ### General
 
+- [ ] Always use the **built-in native title field** (`hasTitleField: true`) instead of adding a custom Plain Text field for the entry name. Only disable the native title field on entry types that don't need a user-editable title (e.g. Page Builder blocks that use `titleFormat`).
 - [ ] Review each field and mark it **required** where appropriate (e.g. `Content` and `Image` in a Content Media block).
 - [ ] Reusable elements (e.g. FAQ item, Team Member) and entries without a URI format use the **`rectangle-history`** icon.
 
