@@ -5,13 +5,26 @@ Shared GitHub configuration for Lameco projects.
 ## Reusable Workflows
 
 ### [deploy-php.yml](.github/workflows/deploy-php.yml)
-Deployment workflow for PHP projects (Symfony, Craft CMS) using Deployer. Builds assets in CI, then deploys via Deployer.
+Deploy-only workflow for PHP projects without a frontend build step (e.g. Asset Mapper). Just Composer + Deployer.
+
+```yaml
+jobs:
+  deploy:
+    uses: Lameco-Development/.github/.github/workflows/deploy-php.yml@main
+    with:
+      environment: production
+    secrets:
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+```
+
+### [build-deploy-php.yml](.github/workflows/build-deploy-php.yml)
+Full workflow for PHP projects with frontend assets (Vite/Webpack). Builds assets in CI, then deploys via Deployer.
 
 ```yaml
 # Symfony (asset_dirs defaults to public/dist)
 jobs:
   deploy:
-    uses: Lameco-Development/.github/.github/workflows/deploy-php.yml@main
+    uses: Lameco-Development/.github/.github/workflows/build-deploy-php.yml@main
     with:
       environment: production
     secrets:
@@ -22,7 +35,7 @@ jobs:
 # Craft CMS (override asset_dirs)
 jobs:
   deploy:
-    uses: Lameco-Development/.github/.github/workflows/deploy-php.yml@main
+    uses: Lameco-Development/.github/.github/workflows/build-deploy-php.yml@main
     with:
       environment: production
       asset_dirs: 'web/dist'

@@ -17,8 +17,9 @@ This repo is **not a buildable application** — there are no build, test, or li
 ```
 .github/
 ├── workflows/
-│   ├── deploy-php.yml            # Reusable PHP deployment (Deployer): build assets + deploy
-│   ├── deploy-node.yml           # Reusable Node deployment: build + rsync to VPS + restart
+│   ├── deploy-php.yml            # PHP deploy only (Asset Mapper projects): Composer + Deployer
+│   ├── build-deploy-php.yml      # PHP + frontend assets: Node build + Deployer
+│   ├── deploy-node.yml           # Node deployment: pnpm build + rsync to VPS + restart
 │   └── craft-update-notes.yml    # Parses composer.lock diffs on PRs, posts changelog
 │                                   notices (security, breaking changes) as PR comments
 ├── guidelines/                   # AI coding guidelines (referenced by copilot-instructions.md)
@@ -37,12 +38,19 @@ renovate.json                     # Monthly PRs for craftcms/* and third-party C
 ## Workflows
 
 ### deploy-php.yml
-Reusable deployment workflow for Symfony and Craft CMS projects. Two jobs:
+Deploy-only workflow for PHP projects without a frontend build step (e.g. Asset Mapper).
+Single job: installs Composer dependencies and runs Deployer.
+
+Inputs: `environment`.
+Secrets: `SSH_PRIVATE_KEY`.
+
+### build-deploy-php.yml
+Full deployment workflow for PHP projects with frontend assets (Vite/Webpack). Two jobs:
 1. **build** — installs PHP + Node dependencies, runs `yarn build`, uploads built assets as artifact
 2. **deploy** — downloads assets, runs Deployer (`deployphp/action@v1`)
 
-Inputs: `environment`, `asset_dirs` (e.g. `public/dist` for Symfony, `web/dist` for Craft CMS).
-Secrets: `SSH_PRIVATE_KEY` (used for both server access and agent forwarding for repo cloning).
+Inputs: `environment`, `asset_dirs` (defaults to `public/dist`; use `web/dist` for Craft CMS).
+Secrets: `SSH_PRIVATE_KEY`.
 PHP version is read from the calling repo's `vars.PHP_VERSION` (defaults to 8.2).
 
 ### deploy-node.yml

@@ -7,11 +7,6 @@ on:
         required: true
         type: string
         description: "The deployer host target (e.g. production, staging)"
-      asset_dirs:
-        required: false
-        type: string
-        default: 'public/dist'
-        description: "Built asset directories (newline-separated). Defaults to public/dist. Use web/dist for Craft CMS."
     secrets:
       SSH_PRIVATE_KEY:
         required: true
@@ -21,55 +16,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ vars.PHP_VERSION || '8.2' }}
-
-      - name: Get Composer cache directory
-        id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Composer dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.composer-cache.outputs.dir }}
-          key: composer-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-
-
-      - name: Install PHP dependencies
-        run: composer install --no-dev --prefer-dist
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'yarn'
-
-      - name: Install Node dependencies
-        run: yarn install --frozen-lockfile
-
-      - name: Build assets
-        run: yarn build
-
-      - name: Upload built assets
-        uses: actions/upload-artifact@v4
-        with:
-          name: built-assets
-          retention-days: 1
-          path: |
-            ${{ inputs.asset_dirs }}
-
   deploy:
-    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -95,11 +42,6 @@ jobs:
 
       - name: Install PHP dependencies
         run: composer install --no-dev --prefer-dist
-
-      - name: Download built assets
-        uses: actions/download-artifact@v4
-        with:
-          name: built-assets
 
       - name: Deploy
         uses: deployphp/action@v1
