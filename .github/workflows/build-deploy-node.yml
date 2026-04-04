@@ -1,4 +1,4 @@
-name: Deploy Node
+name: Build & Deploy Node
 
 on:
   workflow_call:

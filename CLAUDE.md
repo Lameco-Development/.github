@@ -19,7 +19,7 @@ This repo is **not a buildable application** — there are no build, test, or li
 ├── workflows/
 │   ├── deploy-php.yml            # PHP deploy only (Asset Mapper projects): Composer + Deployer
 │   ├── build-deploy-php.yml      # PHP + frontend assets: Node build + Deployer
-│   ├── deploy-node.yml           # Node deployment: pnpm build + rsync to VPS + restart
+│   ├── build-deploy-node.yml           # Node deployment: pnpm build + rsync to VPS + restart
 │   └── craft-update-notes.yml    # Parses composer.lock diffs on PRs, posts changelog
 │                                   notices (security, breaking changes) as PR comments
 ├── guidelines/                   # AI coding guidelines (referenced by copilot-instructions.md)
@@ -53,7 +53,7 @@ Inputs: `environment`, `asset_dirs` (defaults to `public/dist`; use `web/dist` f
 Secrets: `SSH_PRIVATE_KEY`.
 PHP version is read from the calling repo's `vars.PHP_VERSION` (defaults to 8.2).
 
-### deploy-node.yml
+### build-deploy-node.yml
 Reusable deployment workflow for Node.js projects. Single job:
 1. Installs pnpm + dependencies, runs `pnpm run build`
 2. Rsyncs to VPS via `easingthemes/ssh-deploy`

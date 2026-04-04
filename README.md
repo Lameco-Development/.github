@@ -43,13 +43,13 @@ jobs:
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 ```
 
-### [deploy-node.yml](.github/workflows/deploy-node.yml)
+### [build-deploy-node.yml](.github/workflows/build-deploy-node.yml)
 Deployment workflow for Node.js projects. Builds with pnpm, rsyncs to VPS, restarts via supervisord.
 
 ```yaml
 jobs:
   deploy:
-    uses: Lameco-Development/.github/.github/workflows/deploy-node.yml@main
+    uses: Lameco-Development/.github/.github/workflows/build-deploy-node.yml@main
     with:
       environment: production
     secrets:
